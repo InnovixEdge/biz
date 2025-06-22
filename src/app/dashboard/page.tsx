@@ -1,117 +1,62 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { motion } from 'framer-motion'
-import { useSession, signIn } from 'next-auth/react'
-import { useRouter, useSearchParams } from 'next/navigation'
-import { 
-  User, 
-  Crown, 
-  MessageSquare, 
-  Calendar, 
-  Settings, 
-  TrendingUp,
-  Loader2,
-  ArrowRight,
-  ExternalLink
-} from 'lucide-react'
-import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import Header from '@/components/header'
-import Footer from '@/components/footer'
-import UsageProgress from '@/components/usage-progress'
+import { useSearchParams } from 'next/navigation'
 import StripeCheckoutButton from '@/components/stripe-checkout-button'
-
-interface DashboardData {
-  subscription: {
-    tier: 'FREE' | 'PRO'
-    status: string
-    currentPeriodEnd: string | null
-    cancelAtPeriodEnd: boolean
-  }
-  usage: {
-    currentUsage: number
-    limit: number
-    remaining: number
-    canUse: boolean
-    percentageUsed: number
-  }
-}
+import { useUser } from '@/hooks/useUser' // Adjust to your user hook or context
+import { Crown } from 'lucide-react' // Assuming you use lucide icons
 
 export default function DashboardPage() {
-  const { data: session, status } = useSession()
-  const router = useRouter()
   const searchParams = useSearchParams()
-  const [dashboardData, setDashboardData] = useState<DashboardData | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
-  const [isManaging, setIsManaging] = useState(false)
+  const success = searchParams.get('success')
+  const refreshSession = searchParams.get('refreshSession')
+  const sessionId = searchParams.get('session_id')
+  const { user, refreshUser } = useUser() // Your user state and refresh function
+  const [message, setMessage] = useState<string | null>(null)
 
   useEffect(() => {
-    if (status === 'unauthenticated') {
-      router.push('/auth/signin')
-      return
-    }
+    if (success === 'true' && refreshSession === 'true' && sessionId) {
+      const refreshSubscription = async () => {
+        try {
+          // Optionally verify session with Stripe here if you want (not required if webhook trusted)
+          // Just refresh subscription status from your DB
+          const res = await fetch('/api/stripe/refresh-subscription', {
+            method: 'POST',
+          })
 
-    if (status === 'authenticated') {
-      const refresh = searchParams.get('refreshSession')
-      const success = searchParams.get('success')
+          if (!res.ok) {
+            throw new Error('Failed to refresh subscription')
+          }
 
-      if (refresh === 'true') {
-        signIn('credentials', { redirect: false })
+          const data = await res.json()
+
+          setMessage('Your account has been upgraded to Pro!')
+
+          // Refresh user session/profile to update UI
+          await refreshUser()
+        } catch (error) {
+          setMessage('Failed to verify upgrade. Please contact support.')
+        }
       }
 
-      fetchDashboardData()
-
-      // If checkout success, refresh data and clean URL
-      if (success === 'true') {
-        fetchDashboardData()
-        const newUrl = window.location.pathname // remove query string
-        window.history.replaceState({}, '', newUrl)
-      }
+      refreshSubscription()
     }
-  }, [status, router, searchParams])
+  }, [success, refreshSession, sessionId, refreshUser])
 
-  const fetchDashboardData = async () => {
-    try {
-      const response = await fetch('/api/usage')
-      const data = await response.json()
-      setDashboardData(data)
-    } catch (error) {
-      console.error('Error fetching dashboard data:', error)
-    } finally {
-      setIsLoading(false)
-    }
-  }
+  return (
+    <div>
+      {message && <p className="mb-4 text-green-600">{message}</p>}
 
-  const handleManageSubscription = async () => {
-    if (!dashboardData || dashboardData.subscription.tier === 'FREE') return
+      {/* Your existing dashboard content */}
 
-    setIsManaging(true)
-    try {
-      const response = await fetch('/api/create-portal-session', {
-        method: 'POST',
-      })
-      const { url } = await response.json()
-      if (url) {
-        window.location.href = url
-      }
-    } catch (error) {
-      console.error('Error:', error)
-    } finally {
-      setIsManaging(false)
-    }
-  }
+      {user?.tier !== 'PRO' && (
+        <StripeCheckoutButton className="w-full h-10 text-sm" userId={user.id}>
+          <Crown className="mr-2 h-4 w-4" />
+          Upgrade to Pro
+        </StripeCheckoutButton>
+      )}
 
-  if (status === 'loading' || isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
-      </div>
-    )
-  }
-
-  if (!session || !dashboardData) {
-    return null
-  }
-
-  // Your JSX continues as-is below...
+      {user?.tier === 'PRO' && <p>You are on the Pro plan. Thank you!</p>}
+    </div>
+  )
+}
