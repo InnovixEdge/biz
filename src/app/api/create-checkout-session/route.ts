@@ -60,7 +60,8 @@ export async function POST(req: NextRequest) {
         },
       ],
       mode: 'subscription',
-      success_url: `${origin}/dashboard?success=true`,
+      success_url: `${origin}/dashboard?success=true&refreshSession=true`,
+
       cancel_url: `${origin}/pricing?canceled=true`,
       metadata: {
         userId: session.user.id
