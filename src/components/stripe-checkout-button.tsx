@@ -1,69 +1,33 @@
-
-'use client'
-
-import { useState } from 'react'
-import { Button } from '@/components/ui/button'
-import { Crown, Loader2 } from 'lucide-react'
-import { useSession } from 'next-auth/react'
-import { useRouter } from 'next/navigation'
+import React from 'react'
 
 interface StripeCheckoutButtonProps {
+  children: React.ReactNode
   className?: string
-  children?: React.ReactNode
+  userId: string
 }
 
-export default function StripeCheckoutButton({ className, children }: StripeCheckoutButtonProps) {
-  const [isLoading, setIsLoading] = useState(false)
-  const { data: session } = useSession()
-  const router = useRouter()
+const StripeCheckoutButton: React.FC<StripeCheckoutButtonProps> = ({ children, className, userId }) => {
+  const handleClick = async () => {
+    const res = await fetch('/api/create-checkout-session', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId }),
+    })
 
-  const handleCheckout = async () => {
-    if (!session) {
-      router.push('/auth/signin')
-      return
-    }
+    const data = await res.json()
 
-    setIsLoading(true)
-
-    try {
-      const response = await fetch('/api/create-checkout-session', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      })
-
-      const { url } = await response.json()
-
-      if (url) {
-        window.location.href = url
-      }
-    } catch (error) {
-      console.error('Error:', error)
-    } finally {
-      setIsLoading(false)
+    if (data.url) {
+      window.location.href = data.url
+    } else {
+      alert('Failed to start checkout')
     }
   }
 
   return (
-    <Button
-      onClick={handleCheckout}
-      disabled={isLoading}
-      className={className || "w-full h-12 bg-gradient-to-r from-blue-600 to-green-600 text-white hover:from-blue-700 hover:to-green-700 font-semibold shadow-lg hover:shadow-xl transition-all"}
-    >
-      {isLoading ? (
-        <>
-          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-          Loading...
-        </>
-      ) : (
-        children || (
-          <>
-            <Crown className="mr-2 h-4 w-4" />
-            Upgrade to Pro
-          </>
-        )
-      )}
-    </Button>
+    <button className={className} onClick={handleClick}>
+      {children}
+    </button>
   )
 }
+
+export default StripeCheckoutButton
