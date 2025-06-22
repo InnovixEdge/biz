@@ -1,4 +1,3 @@
-
 import { NextRequest, NextResponse } from 'next/server'
 import { stripe, STRIPE_PRICE_ID } from '@/lib/stripe'
 import { getAuthSession } from '@/lib/auth'
@@ -50,7 +49,7 @@ export async function POST(req: NextRequest) {
       })
     }
 
-    // Create checkout session
+    // Create checkout session with session_id in success_url
     const checkoutSession = await stripe.checkout.sessions.create({
       customer: customerId,
       line_items: [
@@ -60,8 +59,7 @@ export async function POST(req: NextRequest) {
         },
       ],
       mode: 'subscription',
-      success_url: `${origin}/dashboard?success=true&refreshSession=true`,
-
+      success_url: `${origin}/dashboard?success=true&refreshSession=true&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${origin}/pricing?canceled=true`,
       metadata: {
         userId: session.user.id
