@@ -1,10 +1,9 @@
-
 'use client'
 
 import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
-import { useSession } from 'next-auth/react'
-import { useRouter } from 'next/navigation'
+import { useSession, signIn } from 'next-auth/react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { 
   User, 
   Crown, 
@@ -42,6 +41,7 @@ interface DashboardData {
 export default function DashboardPage() {
   const { data: session, status } = useSession()
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [dashboardData, setDashboardData] = useState<DashboardData | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [isManaging, setIsManaging] = useState(false)
@@ -53,9 +53,13 @@ export default function DashboardPage() {
     }
 
     if (status === 'authenticated') {
+      const refresh = searchParams.get('refreshSession')
+      if (refresh === 'true') {
+        signIn('credentials', { redirect: false }) // Refresh the session silently
+      }
       fetchDashboardData()
     }
-  }, [status, router])
+  }, [status, router, searchParams])
 
   const fetchDashboardData = async () => {
     try {
